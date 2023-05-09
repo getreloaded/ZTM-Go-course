@@ -82,6 +82,20 @@ func testClampVelocity() {
 	}
 }
 
+type General interface {
+	~int32 | ~float64 | ~float32 | uint32 | int8
+}
+
+func clamp[T General](value, min, max T) T {
+	if value <= min {
+		return min
+	} else if value >= max {
+		return max
+	} else {
+		return value
+	}
+}
+
 func main() {
 	testClampInt8()
 	testClampUint32()
