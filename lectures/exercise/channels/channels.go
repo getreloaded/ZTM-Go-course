@@ -14,11 +14,18 @@
 
 package main
 
-import "fmt"
-import "time"
-import "math/rand"
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+)
+
+const max int = 20
 
 type Job int
+
+var wg sync.WaitGroup
 
 func longCalculation(i Job) int {
 	duration := time.Duration(rand.Intn(1000)) * time.Millisecond
@@ -28,14 +35,43 @@ func longCalculation(i Job) int {
 }
 
 func makeJobs() []Job {
-	jobs := make([]Job, 0, 100)
-	for i := 0; i < 100; i++ {
+	jobs := make([]Job, 0, max)
+	for i := 0; i < cap(jobs); i++ {
 		jobs = append(jobs, Job(rand.Intn(10000)))
 	}
 	return jobs
 }
 
+func calulator(jobChannel <-chan Job, resultChannel chan<- Job) {
+	select {
+	case job := <-jobChannel:
+		resultChannel <- Job(longCalculation(job))
+		wg.Done()
+	default:
+		fmt.Println("No more jobs")
+	}
+}
+
 func main() {
+	t := time.Now()
 	rand.Seed(time.Now().UnixNano())
 	jobs := makeJobs()
+
+	var total Job = 0
+	Jobch := make(chan Job, 100)
+	ResultCh := make(chan Job, 100)
+
+	for i := 0; i < len(jobs); i++ {
+		wg.Add(1)
+		Jobch <- jobs[i]
+		go calulator(Jobch, ResultCh)
+	}
+
+	wg.Wait()
+	for i := 0; i < len(jobs); i++ {
+		total += <-ResultCh
+	}
+
+	fmt.Println("Final Tally:", total, "Time elapsed", time.Since(t))
+
 }
