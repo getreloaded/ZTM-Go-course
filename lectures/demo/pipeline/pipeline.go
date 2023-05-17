@@ -1,6 +1,85 @@
 package main
 
+import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"log"
+	"os"
+	"strings"
+
+	"github.com/chai2010/webp"
+	"github.com/google/uuid"
+)
+
+// decode base64 to image file
+func base64toRAW(base64img string) image.Image {
+	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64img))
+
+	img, _, err := image.Decode(reader)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return img
+}
+
+// convert image to webp
+func ImagetoWebp(img image.Image) bytes.Buffer {
+	var buffer bytes.Buffer
+	var w io.Writer = &buffer
+	err := webp.Encode(w, img, &webp.Options{Lossless: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return buffer
+}
+
+// save the webp images to disk
+func SavetoDisk(imgBuffer bytes.Buffer) string {
+	filename := fmt.Sprintf("%v.webp", uuid.New().String())
+	os.WriteFile(filename, imgBuffer.Bytes(), 0644)
+	return filename
+}
+
+// create jobs
+func CreateJob(Suppliedimg ...string) <-chan string {
+	datain := make(chan string)
+
+	go func() {
+		for _, image := range Suppliedimg {
+			datain <- image
+		}
+		close(datain)
+	}()
+	return datain
+}
+
+func pipeline[I any, O any](input <-chan I, process func(I) O) <-chan O {
+	outputCh := make(chan O)
+	go func() {
+		for in := range input {
+			outputCh <- process(in)
+		}
+		close(outputCh)
+	}()
+	return outputCh
+}
+
 func main() {
+	//inputCh := make(chan string)
+	inputCh := CreateJob(img1, img2, img3)
+	imageFiles := pipeline(inputCh, base64toRAW)
+	WebpFiles := pipeline(imageFiles, ImagetoWebp)
+	Filenames := pipeline(WebpFiles, SavetoDisk)
+
+	for file := range Filenames {
+		fmt.Println(file)
+	}
 }
 
 const img1 = `
