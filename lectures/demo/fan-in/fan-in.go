@@ -88,10 +88,10 @@ func fanIn[T any](input ...<-chan T) <-chan T {
 			}
 		}(in)
 	}
-	//go func() {
-	wg.Wait()
-	close(output)
-	//}()
+	go func() {
+		wg.Wait()
+		close(output)
+	}()
 	return output
 }
 
